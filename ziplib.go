@@ -1,4 +1,4 @@
-package fs
+package ziplib
 
 import (
     "archive/zip"
