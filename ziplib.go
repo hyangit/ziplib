@@ -2,6 +2,8 @@ package ziplib
 
 import (
 	"archive/zip"
+	"bytes"
+	"compress/flate"
 	"fmt"
 	"io"
 	"os"
@@ -102,4 +104,55 @@ func Unzip(archive, target string) error {
 	}
 
 	return nil
+}
+
+// Compress zip
+func Compress(data []byte) ([]byte, error) {
+	buf := new(bytes.Buffer)
+	w := zip.NewWriter(buf)
+	w.RegisterCompressor(zip.Deflate, func(out io.Writer) (io.WriteCloser, error) {
+		return flate.NewWriter(out, flate.BestCompression)
+	})
+
+	f, err := w.Create("filename.ext")
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := f.Write(data); err != nil {
+		return nil, err
+	}
+
+	if err := w.Close(); err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
+}
+
+// Decompress zip
+func Decompress(data []byte) ([]byte, error) {
+	r, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		return nil, err
+	}
+	r.RegisterDecompressor(zip.Deflate, func(r io.Reader) io.ReadCloser {
+		return flate.NewReader(r)
+	})
+
+	if len(r.File) == 0 {
+		return nil, fmt.Errorf("zip empty")
+	}
+	f, err := r.File[0].Open()
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	buf := new(bytes.Buffer)
+	if _, err := io.Copy(buf, f); err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
 }
